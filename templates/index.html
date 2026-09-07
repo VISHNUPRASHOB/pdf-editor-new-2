@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF In-Place Direct Text Editor</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <!-- PDF.js library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
+    <!-- Google Fonts & Lucide Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Top Toolbar -->
+        <header class="toolbar">
+            <div class="toolbar-brand">
+                <i data-lucide="edit-3" class="icon-brand"></i>
+                <span class="app-title">PDF In-Place Editor</span>
+            </div>
+
+            <div class="toolbar-center">
+            </div>
+
+
+            <div class="toolbar-actions">
+                <label class="btn btn-secondary" for="file-upload">
+                    <i data-lucide="upload"></i>
+                    <span>Open PDF</span>
+                </label>
+                <input type="file" id="file-upload" accept="application/pdf" style="display: none;">
+
+                <div class="divider"></div>
+
+                <!-- View Mode & Highlights Controls -->
+                <div class="editor-toggles" id="editor-toggles" style="display: none;">
+                    <button class="btn btn-toggle active" id="toggle-edit-mode" title="Toggle click & select to edit on the document">
+                        <i data-lucide="edit-3"></i>
+                        <span id="edit-mode-btn-label">Edit Mode: ON</span>
+                    </button>
+
+                    <button class="btn btn-toggle active" id="toggle-highlights" title="Show/hide editable text outlines">
+                        <i data-lucide="scan-text"></i>
+                        <span>Show Outlines</span>
+                    </button>
+
+                    <div class="segmented-control" title="Edit by full line or single word">
+                        <button class="segment active" id="mode-lines">Line Mode</button>
+                        <button class="segment" id="mode-words">Word Mode</button>
+                    </div>
+
+                    <button class="btn btn-toggle" id="btn-image-text-mode" title="Click & drag over any text in an image or scan to replace it">
+                        <i data-lucide="crop"></i>
+                        <span>Edit Image Text</span>
+                    </button>
+
+                    <button class="btn btn-toggle" id="btn-add-text-mode" title="Click anywhere on the PDF to type new text">
+                        <i data-lucide="plus-circle"></i>
+                        <span>Add Text</span>
+                    </button>
+                </div>
+
+
+
+                <div class="divider"></div>
+
+                <!-- Page Navigation Controls -->
+                <div class="page-controls" id="page-controls" style="display: none;">
+                    <button class="btn btn-icon" id="prev-page" title="Previous Page">
+                        <i data-lucide="chevron-left"></i>
+                    </button>
+                    <span class="page-indicator">
+                        <span id="current-page-num">1</span> / <span id="total-pages">1</span>
+                    </span>
+                    <button class="btn btn-icon" id="next-page" title="Next Page">
+                        <i data-lucide="chevron-right"></i>
+                    </button>
+                </div>
+
+                <!-- Zoom Controls -->
+                <div class="zoom-controls" id="zoom-controls" style="display: none;">
+                    <button class="btn btn-icon" id="zoom-out" title="Zoom Out">
+                        <i data-lucide="minus"></i>
+                    </button>
+                    <span id="zoom-level">125%</span>
+                    <button class="btn btn-icon" id="zoom-in" title="Zoom In">
+                        <i data-lucide="plus"></i>
+                    </button>
+                </div>
+
+                <div class="divider"></div>
+
+                <button class="btn btn-success" id="download-btn" disabled>
+                    <i data-lucide="download"></i>
+                    <span>Download PDF</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Workspace Area -->
+        <main class="workspace" id="workspace">
+            <!-- Initial Upload Drop Area -->
+            <div class="empty-state" id="empty-state">
+                <div class="drop-zone" id="drop-zone">
+                    <div class="drop-icon-wrap">
+                        <i data-lucide="file-up" class="drop-icon"></i>
+                    </div>
+                    <h2>Drop your PDF file here</h2>
+                    <p>Select or click any text directly on the document to edit in-place</p>
+                    <button class="btn btn-primary btn-lg" onclick="document.getElementById('file-upload').click()">
+                        <i data-lucide="folder-open"></i>
+                        Select PDF File
+                    </button>
+                    <div class="feature-bullets">
+                        <div class="bullet-item"><i data-lucide="check-circle-2"></i> <strong>Click to Edit</strong>: Click directly on any text on the page to modify it in-place</div>
+                        <div class="bullet-item"><i data-lucide="check-circle-2"></i> <strong>Select Text</strong>: Highlight any text with your cursor and click "Edit Selection"</div>
+                        <div class="bullet-item"><i data-lucide="check-circle-2"></i> <strong>Add Text</strong>: Click anywhere on the document to insert new text cleanly</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PDF Canvas & Interactive Overlay -->
+            <div class="viewer-wrapper" id="viewer-wrapper" style="display: none;">
+                <div class="pdf-canvas-container" id="pdf-container">
+                    <canvas id="pdf-canvas"></canvas>
+                    <!-- In-line text editing overlay -->
+                    <div class="text-overlay highlights-visible" id="text-overlay"></div>
+
+                    <!-- Drag selection marquee for replacing image text -->
+                    <div id="image-drag-marquee" class="image-drag-marquee" style="display: none;"></div>
+
+                    <!-- Floating Selection Action Badge (Appears when user highlights text with cursor) -->
+                    <div class="selection-action-badge" id="selection-badge" style="display: none;">
+                        <button class="btn-selection-edit" id="btn-edit-selection">
+                            <i data-lucide="edit-3"></i>
+                            <span>Edit Selected Text</span>
+                        </button>
+                    </div>
+
+                    <!-- Floating In-line Formatting Toolbar for Active Edit -->
+                    <div class="inline-floating-toolbar" id="inline-toolbar" style="display: none;">
+                        <div class="toolbar-group">
+                            <span class="tool-label">Font:</span>
+                            <select id="inline-font-select" class="inline-select" title="Change font family">
+                                <option value="helv">Arial / Helvetica</option>
+                                <option value="hebo">Arial Bold</option>
+                                <option value="heit">Arial Italic</option>
+                                <option value="times">Times New Roman</option>
+                                <option value="couri">Courier Mono</option>
+                            </select>
+                        </div>
+
+                        <div class="toolbar-group">
+                            <span class="tool-label">Size:</span>
+                            <button class="btn-tool-icon" id="inline-font-decrease" title="Decrease font size">-</button>
+                            <span id="inline-font-size-val">12</span>
+                            <button class="btn-tool-icon" id="inline-font-increase" title="Increase font size">+</button>
+                        </div>
+
+                        <div class="toolbar-group">
+                            <span class="tool-label">Color:</span>
+                            <input type="color" id="inline-color-picker" value="#000000" title="Text color">
+                        </div>
+
+                        <div class="toolbar-group">
+                            <span class="tool-label">Bg:</span>
+                            <input type="color" id="inline-bg-picker" value="#ffffff" title="Background cover color (covers old image text)">
+                        </div>
+
+                        <div class="divider-v"></div>
+
+                        <button class="btn-tool-action save" id="inline-save-btn" title="Save changes (Enter)">
+                            <i data-lucide="check"></i> Save
+                        </button>
+                        <button class="btn-tool-action cancel" id="inline-cancel-btn" title="Cancel edit (Esc)">
+                            <i data-lucide="x"></i>
+                        </button>
+                    </div>
+
+                </div>
+            </div>
+        </main>
+    </div>
+
+
+    <!-- Toast Notification -->
+    <div class="toast-notification" id="toast" style="display: none;">
+        <i data-lucide="loader-2" class="toast-spinner" id="toast-icon"></i>
+        <span id="toast-message">Processing...</span>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+    <script>
+        lucide.createIcons();
+    </script>
+</body>
+</html>
