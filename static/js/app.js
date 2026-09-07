@@ -49,9 +49,12 @@ const inlineColorPicker = document.getElementById('inline-color-picker');
 const inlineBgPicker = document.getElementById('inline-bg-picker');
 const inlineSaveBtn = document.getElementById('inline-save-btn');
 const inlineCancelBtn = document.getElementById('inline-cancel-btn');
-
-
-// Selection Action Badge
+const inlineEraseBtn = document.getElementById('inline-erase-btn');
+const btnToggleBold = document.getElementById('btn-toggle-bold');
+const btnToggleItalic = document.getElementById('btn-toggle-italic');
+const btnAlignLeft = document.getElementById('btn-align-left');
+const btnAlignCenter = document.getElementById('btn-align-center');
+const btnAlignRight = document.getElementById('btn-align-right');
 const selectionBadge = document.getElementById('selection-badge');
 const btnEditSelection = document.getElementById('btn-edit-selection');
 let currentSelectedTarget = null;
@@ -431,6 +434,9 @@ function startInlineEditing(box, item, pageIndex, scaleX, scaleY) {
     const initialBgColor = item.bg_color_hex || '#ffffff';
     box.style.backgroundColor = initialBgColor;
 
+    const detectedAlign = item.align || 'left';
+    input.style.textAlign = detectedAlign;
+
     activeInlineEditor = {
         boxElement: box,
         inputElement: input,
@@ -441,6 +447,7 @@ function startInlineEditing(box, item, pageIndex, scaleX, scaleY) {
         origHeight: origBoxHeight,
         currentFontSize: item.size || 11,
         currentFont: inlineFontSelect.value,
+        currentAlign: detectedAlign,
         currentColorHex: item.color_hex || '#000000',
         currentBgColorHex: initialBgColor
     };
@@ -457,10 +464,16 @@ function startInlineEditing(box, item, pageIndex, scaleX, scaleY) {
     input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
             e.preventDefault();
-            commitInlineEdit();
+            commitInlineEdit(false);
         } else if (e.key === 'Escape') {
             e.preventDefault();
             closeActiveInlineEditor(false);
+        } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+            e.preventDefault();
+            toggleBoldStyle();
+        } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'i') {
+            e.preventDefault();
+            toggleItalicStyle();
         }
     });
 
@@ -476,12 +489,73 @@ function startInlineEditing(box, item, pageIndex, scaleX, scaleY) {
     }, 40);
 }
 
+function setEditorAlignment(align) {
+    if (!activeInlineEditor) return;
+    activeInlineEditor.currentAlign = align;
+    activeInlineEditor.inputElement.style.textAlign = align;
+
+    if (btnAlignLeft) btnAlignLeft.classList.toggle('active', align === 'left');
+    if (btnAlignCenter) btnAlignCenter.classList.toggle('active', align === 'center');
+    if (btnAlignRight) btnAlignRight.classList.toggle('active', align === 'right');
+}
+
+function toggleBoldStyle() {
+    if (!activeInlineEditor) return;
+    const currentVal = inlineFontSelect.value;
+    let nextVal = currentVal;
+    
+    // Toggle bold on Helvetica/Arial
+    if (currentVal === 'helv') nextVal = 'hebo';
+    else if (currentVal === 'hebo') nextVal = 'helv';
+    else if (currentVal === 'heit') nextVal = 'hebi';
+    else if (currentVal === 'hebi') nextVal = 'heit';
+    // Toggle bold on Times
+    else if (currentVal === 'times') nextVal = 'tibo';
+    else if (currentVal === 'tibo') nextVal = 'times';
+    else if (currentVal === 'tiit') nextVal = 'tibi';
+    else if (currentVal === 'tibi') nextVal = 'tiit';
+    // Toggle bold on Courier
+    else if (currentVal === 'couri') nextVal = 'cobo';
+    else if (currentVal === 'cobo') nextVal = 'couri';
+
+    inlineFontSelect.value = nextVal;
+    inlineFontSelect.dispatchEvent(new Event('change'));
+}
+
+function toggleItalicStyle() {
+    if (!activeInlineEditor) return;
+    const currentVal = inlineFontSelect.value;
+    let nextVal = currentVal;
+    
+    // Toggle italic on Helvetica/Arial
+    if (currentVal === 'helv') nextVal = 'heit';
+    else if (currentVal === 'heit') nextVal = 'helv';
+    else if (currentVal === 'hebo') nextVal = 'hebi';
+    else if (currentVal === 'hebi') nextVal = 'hebo';
+    // Toggle italic on Times
+    else if (currentVal === 'times') nextVal = 'tiit';
+    else if (currentVal === 'tiit') nextVal = 'times';
+    else if (currentVal === 'tibo') nextVal = 'tibi';
+    else if (currentVal === 'tibi') nextVal = 'tibo';
+
+    inlineFontSelect.value = nextVal;
+    inlineFontSelect.dispatchEvent(new Event('change'));
+}
+
+function updateStyleToggleButtons(fontVal) {
+    const isBold = ['hebo', 'hebi', 'tibo', 'tibi', 'cobo'].includes(fontVal);
+    const isItalic = ['heit', 'hebi', 'tiit', 'tibi'].includes(fontVal);
+
+    if (btnToggleBold) btnToggleBold.classList.toggle('active', isBold);
+    if (btnToggleItalic) btnToggleItalic.classList.toggle('active', isItalic);
+}
+
 function positionInlineToolbar(box) {
     const boxRect = box.getBoundingClientRect();
     const containerRect = pdfContainer.getBoundingClientRect();
 
     const topOffset = boxRect.top - containerRect.top - 48;
-    const leftOffset = Math.max(5, Math.min(boxRect.left - containerRect.left, containerRect.width - 360));
+    const leftOffset = Math.max(5, Math.min(boxRect.left - containerRect.left, containerRect.width - 480));
 
     inlineToolbar.style.top = `${Math.max(5, topOffset)}px`;
     inlineToolbar.style.left = `${leftOffset}px`;
@@ -492,6 +566,9 @@ function positionInlineToolbar(box) {
         inlineBgPicker.value = activeInlineEditor.currentBgColorHex || '#ffffff';
     }
 
+    setEditorAlignment(activeInlineEditor.currentAlign || 'left');
+    updateStyleToggleButtons(activeInlineEditor.currentFont || 'helv');
+    if (window.lucide) window.lucide.createIcons();
     inlineToolbar.style.display = 'flex';
 }
 
@@ -520,20 +597,20 @@ function closeActiveInlineEditor(revert = false) {
 
 
 // Save in-line edit to PDF
-async function commitInlineEdit() {
+async function commitInlineEdit(isErase = false) {
     if (!activeInlineEditor) return;
 
-    const { itemData, pageIndex, inputElement, currentFontSize, currentFont, currentColorHex, currentBgColorHex } = activeInlineEditor;
-    const newText = inputElement.value;
+    const { itemData, pageIndex, inputElement, currentFontSize, currentFont, currentAlign, currentColorHex, currentBgColorHex } = activeInlineEditor;
+    const newText = isErase ? '' : inputElement.value;
 
-    if ((itemData.is_add || itemData.is_image_text) && !newText.trim()) {
+    if (!isErase && (itemData.is_add || itemData.is_image_text) && !newText.trim()) {
         // If user didn't type anything in add/image text mode, just close
         closeActiveInlineEditor(false);
         return;
     }
 
     closeActiveInlineEditor(false);
-    showToast('Saving changes directly to PDF...', 0);
+    showToast(isErase ? 'Erasing text from PDF...' : 'Saving changes directly to PDF...', 0);
 
     try {
         const colorRgb = hexToRgb01(currentColorHex);
@@ -546,19 +623,20 @@ async function commitInlineEdit() {
             body: JSON.stringify({
                 session_id: currentSessionId,
                 page_num: pageIndex,
-                mode: isAddMode ? 'add' : 'edit',
+                mode: isErase ? 'erase' : (isAddMode ? 'add' : 'edit'),
                 bbox: itemData.bbox,
                 origin: itemData.origin,
                 new_text: newText,
                 size: currentFontSize,
                 font: currentFont,
+                align: currentAlign || 'left',
                 color_rgb: colorRgb,
                 bg_color_rgb: bgColorRgb
             })
         });
 
         await loadPdfViewer();
-        showToast(isAddMode ? 'New text added!' : 'Text updated successfully!', 2500);
+        showToast(isErase ? 'Text erased successfully!' : (isAddMode ? 'New text added!' : 'Text updated successfully!'), 2500);
     } catch (err) {
         hideToast();
         alert('Failed to save edit: ' + err.message);
@@ -568,13 +646,55 @@ async function commitInlineEdit() {
 
 inlineSaveBtn.addEventListener('click', (e) => {
     e.stopPropagation();
-    commitInlineEdit();
+    commitInlineEdit(false);
 });
+
+if (inlineEraseBtn) {
+    inlineEraseBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        commitInlineEdit(true);
+    });
+}
 
 inlineCancelBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     closeActiveInlineEditor(false);
 });
+
+if (btnToggleBold) {
+    btnToggleBold.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleBoldStyle();
+    });
+}
+
+if (btnToggleItalic) {
+    btnToggleItalic.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleItalicStyle();
+    });
+}
+
+if (btnAlignLeft) {
+    btnAlignLeft.addEventListener('click', (e) => {
+        e.stopPropagation();
+        setEditorAlignment('left');
+    });
+}
+
+if (btnAlignCenter) {
+    btnAlignCenter.addEventListener('click', (e) => {
+        e.stopPropagation();
+        setEditorAlignment('center');
+    });
+}
+
+if (btnAlignRight) {
+    btnAlignRight.addEventListener('click', (e) => {
+        e.stopPropagation();
+        setEditorAlignment('right');
+    });
+}
 
 inlineFontIncrease.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -641,6 +761,7 @@ inlineFontSelect.addEventListener('change', (e) => {
         activeInlineEditor.inputElement.style.fontWeight = 'normal';
         activeInlineEditor.inputElement.style.fontStyle = 'normal';
     }
+    updateStyleToggleButtons(fVal);
 });
 
 inlineColorPicker.addEventListener('input', (e) => {

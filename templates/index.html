@@ -161,6 +161,29 @@
                             </select>
                         </div>
 
+                        <!-- Quick Bold / Italic Toggles -->
+                        <div class="toolbar-group">
+                            <button class="btn-tool-icon btn-style-toggle" id="btn-toggle-bold" title="Bold (Ctrl+B)">
+                                <strong>B</strong>
+                            </button>
+                            <button class="btn-tool-icon btn-style-toggle" id="btn-toggle-italic" title="Italic (Ctrl+I)">
+                                <em>I</em>
+                            </button>
+                        </div>
+
+                        <!-- Alignment Controls -->
+                        <div class="toolbar-group" title="Text Alignment">
+                            <button class="btn-tool-icon btn-align active" id="btn-align-left" title="Align Left">
+                                <i data-lucide="align-left"></i>
+                            </button>
+                            <button class="btn-tool-icon btn-align" id="btn-align-center" title="Align Center">
+                                <i data-lucide="align-center"></i>
+                            </button>
+                            <button class="btn-tool-icon btn-align" id="btn-align-right" title="Align Right">
+                                <i data-lucide="align-right"></i>
+                            </button>
+                        </div>
+
                         <div class="toolbar-group">
                             <span class="tool-label">Size:</span>
                             <button class="btn-tool-icon" id="inline-font-decrease" title="Decrease font size">-</button>
@@ -175,11 +198,14 @@
 
                         <div class="toolbar-group">
                             <span class="tool-label">Bg:</span>
-                            <input type="color" id="inline-bg-picker" value="#ffffff" title="Background cover color (covers old image text)">
+                            <input type="color" id="inline-bg-picker" value="#ffffff" title="Background cover color (covers old image text or whiteout)">
                         </div>
 
                         <div class="divider-v"></div>
 
+                        <button class="btn-tool-action erase" id="inline-erase-btn" title="Erase / Whiteout this text without replacing">
+                            <i data-lucide="eraser"></i> Erase
+                        </button>
                         <button class="btn-tool-action save" id="inline-save-btn" title="Save changes (Enter)">
                             <i data-lucide="check"></i> Save
                         </button>

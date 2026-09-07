@@ -97,30 +97,54 @@ def get_font_candidate(font_name):
     elif 'italic' in clean or 'oblique' in clean:
         return 'heit'
     
-    return 'helv'
-
-def safe_insert_text(page, point, text, fontsize, fontname, color):
+def safe_insert_text(page, point, text, fontsize, fontname, color, rect=None, align='left'):
     candidate = get_font_candidate(fontname)
+    fs = float(fontsize)
+    c = color if isinstance(color, (list, tuple)) and len(color) == 3 else (0, 0, 0)
+    
+    # Calculate horizontal alignment offset if rect is provided
+    x = point.x
+    if rect is not None and align in ('center', 'right'):
+        try:
+            text_len = fitz.get_text_length(text, fontname=candidate, fontsize=fs)
+        except Exception:
+            text_len = len(text) * fs * 0.55
+        
+        if align == 'right':
+            x = rect.x1 - text_len
+        elif align == 'center':
+            x = rect.x0 + max(0, (rect.width - text_len) / 2)
+            
+    final_point = fitz.Point(x, point.y)
+
     # Attempt 1: Valid Base-14 font code
     try:
-        page.insert_text(point, text, fontsize=float(fontsize), fontname=candidate, color=color)
+        page.insert_text(final_point, text, fontsize=fs, fontname=candidate, color=c)
         return
     except Exception:
         pass
 
     # Attempt 2: Standard built-in Helvetica
     try:
-        page.insert_text(point, text, fontsize=float(fontsize), fontname='helv', color=color)
+        page.insert_text(final_point, text, fontsize=fs, fontname='helv', color=c)
         return
     except Exception:
         pass
 
     # Attempt 3: PyMuPDF default
     try:
-        page.insert_text(point, text, fontsize=float(fontsize), color=color)
+        page.insert_text(final_point, text, fontsize=fs, color=c)
         return
     except Exception:
         pass
+
+    # Attempt 4: Textbox alignment fallback
+    if rect is not None:
+        try:
+            al = fitz.TEXT_ALIGN_RIGHT if align == 'right' else (fitz.TEXT_ALIGN_CENTER if align == 'center' else fitz.TEXT_ALIGN_LEFT)
+            page.insert_textbox(rect, text, fontsize=fs, color=c, align=al)
+        except Exception:
+            pass
 
 def safe_apply_redactions(page):
     # CRITICAL: Always use images=PDF_REDACT_IMAGE_NONE first!
@@ -323,6 +347,16 @@ def get_text_blocks(session_id, page_num):
                         line_bbox = [x0, y0, x1, y1]
 
                     if full_line_text:
+                        # Alignment heuristic
+                        line_align = 'left'
+                        if page_width > 0 and len(line_bbox) >= 4:
+                            right_dist = page_width - line_bbox[2]
+                            left_dist = line_bbox[0]
+                            if line_bbox[0] > (page_width * 0.45) and right_dist < 85:
+                                line_align = 'right'
+                            elif abs(right_dist - left_dist) < 35 and left_dist > 40:
+                                line_align = 'center'
+
                         line_obj = {
                             'id': f"line_{b_idx}_{l_idx}",
                             'text': full_line_text,
@@ -331,6 +365,7 @@ def get_text_blocks(session_id, page_num):
                             'spans': spans,
                             'size': primary_size,
                             'font': primary_font,
+                            'align': line_align,
                             'color_rgb': primary_color,
                             'color_hex': primary_hex
                         }
@@ -371,13 +406,14 @@ def edit_text():
     data = request.get_json() or {}
     session_id = data.get('session_id')
     page_num = data.get('page_num', 0)
-    mode = data.get('mode', 'edit')  # 'edit' (replaces existing text) or 'add' (inserts new text without redaction)
+    mode = data.get('mode', 'edit')  # 'edit' (replaces existing text), 'add' (inserts new text), or 'erase' (whiteout/delete)
     bbox = data.get('bbox')  # [x0, y0, x1, y1]
     origin = data.get('origin')  # [ox, oy] text baseline
     new_text = data.get('new_text', '')
     font_size = data.get('size', 11)
     color_rgb = data.get('color_rgb', [0, 0, 0])
     font_name = data.get('font', 'helv')
+    align = data.get('align', 'left')  # 'left', 'center', 'right'
 
     path = get_session_pdf_path(session_id)
     if not path:
@@ -408,11 +444,12 @@ def edit_text():
                     new_text,
                     fontsize=float(font_size),
                     fontname=font_name,
-                    color=c
+                    color=c,
+                    rect=None,
+                    align=align
                 )
         else:
-            # EDITING EXISTING TEXT (or Image Text):
-            # Targets the exact bounding box and covers underlying image pixels or text
+            # EDITING OR ERASING EXISTING TEXT (or Image Text):
             if bbox and len(bbox) >= 4:
                 rect = fitz.Rect(bbox[0], bbox[1], bbox[2], bbox[3])
 
@@ -427,7 +464,7 @@ def edit_text():
                 page.add_redact_annot(rect, fill=bg_c)
                 safe_apply_redactions(page)
 
-                if new_text.strip():
+                if mode != 'erase' and new_text.strip():
                     if origin and len(origin) >= 2:
                         baseline_point = fitz.Point(rect.x0, origin[1])
                     else:
@@ -439,7 +476,9 @@ def edit_text():
                         new_text,
                         fontsize=float(font_size),
                         fontname=font_name,
-                        color=c
+                        color=c,
+                        rect=rect,
+                        align=align
                     )
 
 

@@ -597,6 +597,28 @@ body {
     background-color: var(--success-hover);
 }
 
+.btn-tool-icon i {
+    width: 14px;
+    height: 14px;
+}
+
+.btn-tool-icon.active {
+    background-color: var(--primary) !important;
+    color: #ffffff !important;
+    border-color: var(--primary) !important;
+}
+
+.btn-tool-action.erase {
+    background-color: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+.btn-tool-action.erase:hover {
+    background-color: #ef4444;
+    color: #ffffff;
+}
+
 .btn-tool-action.cancel {
     background-color: var(--bg-card);
     color: var(--text-secondary);
