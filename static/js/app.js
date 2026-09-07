@@ -431,11 +431,29 @@ function startInlineEditing(box, item, pageIndex, scaleX, scaleY) {
         }
     }
 
+    const origBoxLeft = parseFloat(box.style.left) || 0;
     const initialBgColor = item.bg_color_hex || '#ffffff';
     box.style.backgroundColor = initialBgColor;
 
     const detectedAlign = item.align || 'left';
     input.style.textAlign = detectedAlign;
+
+    function adjustWidth() {
+        const textLength = (input.value || input.placeholder || '').length || 1;
+        const charWidthEst = fontSizePx * 0.65;
+        const neededWidth = Math.max(origBoxWidth, (textLength + 3) * charWidthEst, 60);
+        box.style.width = `${neededWidth}px`;
+
+        if (activeInlineEditor && activeInlineEditor.currentAlign === 'right') {
+            const rightEdge = origBoxLeft + origBoxWidth;
+            box.style.left = `${Math.max(0, rightEdge - neededWidth)}px`;
+        } else if (activeInlineEditor && activeInlineEditor.currentAlign === 'center') {
+            const centerPoint = origBoxLeft + (origBoxWidth / 2);
+            box.style.left = `${Math.max(0, centerPoint - (neededWidth / 2))}px`;
+        } else {
+            box.style.left = `${origBoxLeft}px`;
+        }
+    }
 
     activeInlineEditor = {
         boxElement: box,
@@ -443,21 +461,16 @@ function startInlineEditing(box, item, pageIndex, scaleX, scaleY) {
         itemData: item,
         pageIndex: pageIndex,
         origText: item.text || '',
+        origLeft: origBoxLeft,
         origWidth: origBoxWidth,
         origHeight: origBoxHeight,
         currentFontSize: item.size || 11,
         currentFont: inlineFontSelect.value,
         currentAlign: detectedAlign,
         currentColorHex: item.color_hex || '#000000',
-        currentBgColorHex: initialBgColor
+        currentBgColorHex: initialBgColor,
+        adjustWidth: adjustWidth
     };
-
-    function adjustWidth() {
-        const textLength = (input.value || input.placeholder || '').length || 1;
-        const charWidthEst = fontSizePx * 0.65;
-        const neededWidth = Math.max(origBoxWidth, (textLength + 3) * charWidthEst, 60);
-        box.style.width = `${neededWidth}px`;
-    }
 
     input.addEventListener('input', adjustWidth);
 
@@ -503,6 +516,10 @@ function setEditorAlignment(align) {
     if (btnAlignLeft) btnAlignLeft.classList.toggle('active', align === 'left');
     if (btnAlignCenter) btnAlignCenter.classList.toggle('active', align === 'center');
     if (btnAlignRight) btnAlignRight.classList.toggle('active', align === 'right');
+
+    if (activeInlineEditor.adjustWidth) {
+        activeInlineEditor.adjustWidth();
+    }
 }
 
 function toggleBoldStyle() {

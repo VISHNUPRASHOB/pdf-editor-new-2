@@ -357,6 +357,10 @@ def get_text_blocks(session_id, page_num):
                             elif abs(right_dist - left_dist) < 35 and left_dist > 40:
                                 line_align = 'center'
 
+                        # Attach align to each span in the line
+                        for s in spans:
+                            s['align'] = line_align
+
                         line_obj = {
                             'id': f"line_{b_idx}_{l_idx}",
                             'text': full_line_text,
@@ -466,9 +470,13 @@ def edit_text():
 
                 if mode != 'erase' and new_text.strip():
                     if origin and len(origin) >= 2:
-                        baseline_point = fitz.Point(rect.x0, origin[1])
+                        start_x = float(origin[0])
+                        start_y = float(origin[1])
                     else:
-                        baseline_point = fitz.Point(rect.x0, rect.y0 + float(font_size) * 0.82)
+                        start_x = float(rect.x0)
+                        start_y = float(rect.y0) + float(font_size) * 0.82
+
+                    baseline_point = fitz.Point(start_x, start_y)
 
                     safe_insert_text(
                         page,
