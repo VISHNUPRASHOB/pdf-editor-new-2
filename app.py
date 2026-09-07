@@ -106,9 +106,7 @@ def serve_pdf(session_id):
         return jsonify({'error': 'Session not found'}), 404
     
     try:
-        with open(path, 'rb') as f:
-            pdf_bytes = f.read()
-        return send_file(io.BytesIO(pdf_bytes), mimetype='application/pdf')
+        return send_file(path, mimetype='application/pdf')
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -428,15 +426,12 @@ def download_pdf(session_id):
         return jsonify({'error': 'Session not found'}), 404
 
     try:
-        with open(path, 'rb') as f:
-            pdf_bytes = f.read()
-
         original_filename = sessions.get(session_id, {}).get('filename', 'edited_document.pdf')
         name_parts = os.path.splitext(original_filename)
         download_name = f"{name_parts[0]}_edited{name_parts[1]}"
 
         return send_file(
-            io.BytesIO(pdf_bytes),
+            path,
             as_attachment=True,
             download_name=download_name,
             mimetype='application/pdf'
