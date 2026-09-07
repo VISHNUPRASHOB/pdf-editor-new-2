@@ -5,27 +5,72 @@ from flask import Flask, request, jsonify, render_template, send_file
 import fitz  # PyMuPDF
 
 app = Flask(__name__)
-UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+import json
+import tempfile
+
+UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads'))
+try:
+    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+except Exception:
+    UPLOAD_FOLDER = os.path.join(tempfile.gettempdir(), 'pdf_editor_uploads')
+    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100 MB max
 
 sessions = {}
 
 def get_session_pdf_path(session_id):
+    if not session_id:
+        return None
     session = sessions.get(session_id)
-    if session and os.path.exists(session['path']):
+    if session and os.path.exists(session.get('path', '')):
         return session['path']
     candidate = os.path.join(app.config['UPLOAD_FOLDER'], f"{session_id}.pdf")
     if os.path.exists(candidate):
         return candidate
+    # Also check /tmp fallback
+    tmp_candidate = os.path.join(tempfile.gettempdir(), f"{session_id}.pdf")
+    if os.path.exists(tmp_candidate):
+        return tmp_candidate
     return None
+
+def save_session_meta(session_id, filename):
+    meta_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{session_id}.json")
+    try:
+        with open(meta_path, 'w', encoding='utf-8') as f:
+            json.dump({'filename': filename}, f)
+    except Exception:
+        pass
+
+def get_session_filename(session_id):
+    meta_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{session_id}.json")
+    if os.path.exists(meta_path):
+        try:
+            with open(meta_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                return data.get('filename', 'edited_document.pdf')
+        except Exception:
+            pass
+    return sessions.get(session_id, {}).get('filename', 'edited_document.pdf')
 
 def get_font_candidate(font_name):
     lower = (font_name or '').lower()
     if 'times' in lower or 'serif' in lower:
+        if 'bold' in lower and ('italic' in lower or 'oblique' in lower):
+            return 'tibi'
+        elif 'bold' in lower:
+            return 'tibo'
+        elif 'italic' in lower or 'oblique' in lower:
+            return 'tiit'
         return 'times'
-    elif 'courier' in lower or 'mono' in lower:
+    elif 'courier' in lower or 'mono' in lower or 'consolas' in lower:
+        if 'bold' in lower and ('italic' in lower or 'oblique' in lower):
+            return 'cobi'
+        elif 'bold' in lower:
+            return 'cobo'
+        elif 'italic' in lower or 'oblique' in lower:
+            return 'coit'
         return 'couri'
     elif 'bold' in lower and ('italic' in lower or 'oblique' in lower):
         return 'hebi'
@@ -34,6 +79,29 @@ def get_font_candidate(font_name):
     elif 'italic' in lower or 'oblique' in lower:
         return 'heit'
     return 'helv'
+
+def safe_insert_text(page, point, text, fontsize, fontname, color):
+    candidate = get_font_candidate(fontname)
+    # Attempt 1: Valid Base-14 font code
+    try:
+        page.insert_text(point, text, fontsize=float(fontsize), fontname=candidate, color=color)
+        return
+    except Exception:
+        pass
+
+    # Attempt 2: Standard built-in Helvetica
+    try:
+        page.insert_text(point, text, fontsize=float(fontsize), fontname='helv', color=color)
+        return
+    except Exception:
+        pass
+
+    # Attempt 3: PyMuPDF default
+    try:
+        page.insert_text(point, text, fontsize=float(fontsize), color=color)
+        return
+    except Exception:
+        pass
 
 def safe_apply_redactions(page):
     # CRITICAL: Always use images=PDF_REDACT_IMAGE_NONE first!
@@ -92,6 +160,7 @@ def upload_pdf():
         'path': saved_path,
         'filename': file.filename
     }
+    save_session_meta(session_id, file.filename)
     
     return jsonify({
         'session_id': session_id,
@@ -305,7 +374,6 @@ def edit_text():
             return jsonify({'error': 'Page index out of bounds'}), 400
 
         page = doc[page_num]
-        font_candidate = get_font_candidate(font_name)
         c = (float(color_rgb[0]), float(color_rgb[1]), float(color_rgb[2])) if len(color_rgb) == 3 else (0, 0, 0)
 
         if mode == 'add':
@@ -315,11 +383,12 @@ def edit_text():
             baseline_y = y + float(font_size) * 0.82
 
             if new_text.strip():
-                page.insert_text(
+                safe_insert_text(
+                    page,
                     fitz.Point(x, baseline_y),
                     new_text,
                     fontsize=float(font_size),
-                    fontname=font_candidate,
+                    fontname=font_name,
                     color=c
                 )
         else:
@@ -345,11 +414,12 @@ def edit_text():
                     else:
                         baseline_point = fitz.Point(rect.x0, rect.y0 + float(font_size) * 0.82)
 
-                    page.insert_text(
+                    safe_insert_text(
+                        page,
                         baseline_point,
                         new_text,
                         fontsize=float(font_size),
-                        fontname=font_candidate,
+                        fontname=font_name,
                         color=c
                     )
 
@@ -395,16 +465,16 @@ def add_new_text():
             return jsonify({'error': 'Page index out of bounds'}), 400
 
         page = doc[page_num]
-        font_candidate = get_font_candidate(font_name)
         c = (float(color_rgb[0]), float(color_rgb[1]), float(color_rgb[2])) if len(color_rgb) == 3 else (0, 0, 0)
         
         # Insert text at exact point without redacting surrounding area
         baseline_point = fitz.Point(x, y + float(font_size) * 0.82)
-        page.insert_text(
+        safe_insert_text(
+            page,
             baseline_point,
             text,
             fontsize=float(font_size),
-            fontname=font_candidate,
+            fontname=font_name,
             color=c
         )
 
@@ -426,7 +496,7 @@ def download_pdf(session_id):
         return jsonify({'error': 'Session not found'}), 404
 
     try:
-        original_filename = sessions.get(session_id, {}).get('filename', 'edited_document.pdf')
+        original_filename = get_session_filename(session_id)
         name_parts = os.path.splitext(original_filename)
         download_name = f"{name_parts[0]}_edited{name_parts[1]}"
 

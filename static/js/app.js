@@ -151,9 +151,11 @@ async function uploadFile(file) {
     const formData = new FormData();
     formData.append('file', file);
 
-    showToast('Loading PDF document...', 0);
+    showToast('Uploading & processing document...', 0);
 
     try {
+        const fileBufferPromise = file.arrayBuffer();
+
         const data = await safeJsonFetch('/upload', {
             method: 'POST',
             body: formData
@@ -174,11 +176,16 @@ async function uploadFile(file) {
         editorToggles.style.display = 'flex';
         downloadBtn.disabled = false;
 
-
         totalPagesSpan.textContent = totalPages;
         currentPageNumSpan.textContent = currentPageNum;
 
-        await loadPdfViewer();
+        // Load document directly from local memory buffer for instant rendering
+        showToast('Rendering page...', 0);
+        closeActiveInlineEditor(false);
+        const buffer = await fileBufferPromise;
+        const loadingTask = pdfjsLib.getDocument({ data: buffer });
+        currentPdfDoc = await loadingTask.promise;
+        await renderPage(currentPageNum);
         hideToast();
         showToast('Ready! Select or click any text to edit in-place.', 3000);
     } catch (err) {
