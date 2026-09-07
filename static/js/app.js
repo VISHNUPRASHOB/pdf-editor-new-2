@@ -120,6 +120,33 @@ dropZone.addEventListener('drop', (e) => {
     }
 });
 
+async function safeJsonFetch(url, options = {}) {
+    const response = await fetch(url, options);
+    const contentType = response.headers.get('content-type') || '';
+    let data = null;
+
+    if (contentType.includes('application/json')) {
+        try {
+            data = await response.json();
+        } catch (e) {
+            data = null;
+        }
+    } else {
+        const text = await response.text();
+        if (!response.ok) {
+            // Strip HTML tags for clean error message
+            const cleanText = text.replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim();
+            throw new Error(`Server error (${response.status}): ${cleanText.substring(0, 120) || response.statusText}`);
+        }
+    }
+
+    if (!response.ok) {
+        throw new Error((data && data.error) ? data.error : `Server error (${response.status})`);
+    }
+
+    return data;
+}
+
 async function uploadFile(file) {
     const formData = new FormData();
     formData.append('file', file);
@@ -127,14 +154,13 @@ async function uploadFile(file) {
     showToast('Loading PDF document...', 0);
 
     try {
-        const response = await fetch('/upload', {
+        const data = await safeJsonFetch('/upload', {
             method: 'POST',
             body: formData
         });
 
-        const data = await response.json();
-        if (!response.ok) {
-            throw new Error(data.error || 'Failed to upload PDF');
+        if (!data || !data.session_id) {
+            throw new Error('Invalid response received from server.');
         }
 
         currentSessionId = data.session_id;
@@ -205,13 +231,8 @@ async function loadTextBlocks(pageIndex, viewport) {
     hideSelectionBadge();
 
     try {
-        const response = await fetch(`/text-blocks/${currentSessionId}/${pageIndex}`);
-        const data = await response.json();
-
-        if (!response.ok) {
-            console.error('Failed to load text spans:', data.error);
-            return;
-        }
+        const data = await safeJsonFetch(`/text-blocks/${currentSessionId}/${pageIndex}`);
+        if (!data) return;
 
         currentPageData = data;
 
@@ -478,7 +499,7 @@ async function commitInlineEdit() {
         const bgColorRgb = hexToRgb01(currentBgColorHex || '#ffffff');
         const isAddMode = Boolean(itemData.is_add);
 
-        const res = await fetch('/edit', {
+        const result = await safeJsonFetch('/edit', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -494,11 +515,6 @@ async function commitInlineEdit() {
                 bg_color_rgb: bgColorRgb
             })
         });
-
-        const result = await res.json();
-        if (!res.ok) {
-            throw new Error(result.error || 'Failed to modify PDF text');
-        }
 
         await loadPdfViewer();
         showToast(isAddMode ? 'New text added!' : 'Text updated successfully!', 2500);

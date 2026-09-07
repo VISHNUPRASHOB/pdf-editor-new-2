@@ -14,9 +14,12 @@ sessions = {}
 
 def get_session_pdf_path(session_id):
     session = sessions.get(session_id)
-    if not session or not os.path.exists(session['path']):
-        return None
-    return session['path']
+    if session and os.path.exists(session['path']):
+        return session['path']
+    candidate = os.path.join(app.config['UPLOAD_FOLDER'], f"{session_id}.pdf")
+    if os.path.exists(candidate):
+        return candidate
+    return None
 
 def get_font_candidate(font_name):
     lower = (font_name or '').lower()
