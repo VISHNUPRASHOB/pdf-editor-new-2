@@ -373,25 +373,59 @@ function startInlineEditing(box, item, pageIndex, scaleX, scaleY) {
     input.style.fontSize = `${fontSizePx}px`;
     input.style.color = item.color_hex || '#000000';
     
-    // Map font family
+    // Map font family and style accurately
     const fontLower = (item.font || '').toLowerCase();
-    if (fontLower.includes('times') || fontLower.includes('serif')) {
-        input.style.fontFamily = 'Times New Roman, serif';
-        inlineFontSelect.value = 'times';
-    } else if (fontLower.includes('courier') || fontLower.includes('mono')) {
-        input.style.fontFamily = 'Courier, monospace';
-        inlineFontSelect.value = 'couri';
-    } else if (fontLower.includes('bold')) {
-        input.style.fontFamily = 'Arial, sans-serif';
-        input.style.fontWeight = 'bold';
-        inlineFontSelect.value = 'hebo';
-    } else if (fontLower.includes('italic') || fontLower.includes('oblique')) {
-        input.style.fontFamily = 'Arial, sans-serif';
-        input.style.fontStyle = 'italic';
-        inlineFontSelect.value = 'heit';
+    const isBold = fontLower.includes('bold') || fontLower.includes('black') || fontLower.includes('heavy');
+    const isItalic = fontLower.includes('italic') || fontLower.includes('oblique');
+
+    if (fontLower.includes('times') || fontLower.includes('serif') || fontLower.includes('georgia') || fontLower.includes('garamond') || fontLower.includes('cambria')) {
+        input.style.fontFamily = 'Times New Roman, Georgia, serif';
+        if (isBold && isItalic) {
+            inlineFontSelect.value = 'tibi';
+            input.style.fontWeight = 'bold';
+            input.style.fontStyle = 'italic';
+        } else if (isBold) {
+            inlineFontSelect.value = 'tibo';
+            input.style.fontWeight = 'bold';
+            input.style.fontStyle = 'normal';
+        } else if (isItalic) {
+            inlineFontSelect.value = 'tiit';
+            input.style.fontWeight = 'normal';
+            input.style.fontStyle = 'italic';
+        } else {
+            inlineFontSelect.value = 'times';
+            input.style.fontWeight = 'normal';
+            input.style.fontStyle = 'normal';
+        }
+    } else if (fontLower.includes('courier') || fontLower.includes('mono') || fontLower.includes('consolas')) {
+        input.style.fontFamily = 'Courier New, Courier, monospace';
+        if (isBold) {
+            inlineFontSelect.value = 'cobo';
+            input.style.fontWeight = 'bold';
+        } else {
+            inlineFontSelect.value = 'couri';
+            input.style.fontWeight = 'normal';
+        }
+        input.style.fontStyle = isItalic ? 'italic' : 'normal';
     } else {
-        input.style.fontFamily = 'Arial, sans-serif';
-        inlineFontSelect.value = 'helv';
+        input.style.fontFamily = 'Arial, Helvetica, sans-serif';
+        if (isBold && isItalic) {
+            inlineFontSelect.value = 'hebi';
+            input.style.fontWeight = 'bold';
+            input.style.fontStyle = 'italic';
+        } else if (isBold) {
+            inlineFontSelect.value = 'hebo';
+            input.style.fontWeight = 'bold';
+            input.style.fontStyle = 'normal';
+        } else if (isItalic) {
+            inlineFontSelect.value = 'heit';
+            input.style.fontWeight = 'normal';
+            input.style.fontStyle = 'italic';
+        } else {
+            inlineFontSelect.value = 'helv';
+            input.style.fontWeight = 'normal';
+            input.style.fontStyle = 'normal';
+        }
     }
 
     const initialBgColor = item.bg_color_hex || '#ffffff';
@@ -565,20 +599,45 @@ inlineFontSelect.addEventListener('change', (e) => {
     if (!activeInlineEditor) return;
     activeInlineEditor.currentFont = inlineFontSelect.value;
     const fVal = inlineFontSelect.value;
+
     if (fVal === 'times') {
         activeInlineEditor.inputElement.style.fontFamily = 'Times New Roman, serif';
         activeInlineEditor.inputElement.style.fontWeight = 'normal';
-    } else if (fVal === 'couri') {
-        activeInlineEditor.inputElement.style.fontFamily = 'Courier, monospace';
-        activeInlineEditor.inputElement.style.fontWeight = 'normal';
-    } else if (fVal === 'hebo') {
-        activeInlineEditor.inputElement.style.fontFamily = 'Arial, sans-serif';
+        activeInlineEditor.inputElement.style.fontStyle = 'normal';
+    } else if (fVal === 'tibo') {
+        activeInlineEditor.inputElement.style.fontFamily = 'Times New Roman, serif';
         activeInlineEditor.inputElement.style.fontWeight = 'bold';
+        activeInlineEditor.inputElement.style.fontStyle = 'normal';
+    } else if (fVal === 'tiit') {
+        activeInlineEditor.inputElement.style.fontFamily = 'Times New Roman, serif';
+        activeInlineEditor.inputElement.style.fontWeight = 'normal';
+        activeInlineEditor.inputElement.style.fontStyle = 'italic';
+    } else if (fVal === 'tibi') {
+        activeInlineEditor.inputElement.style.fontFamily = 'Times New Roman, serif';
+        activeInlineEditor.inputElement.style.fontWeight = 'bold';
+        activeInlineEditor.inputElement.style.fontStyle = 'italic';
+    } else if (fVal === 'couri') {
+        activeInlineEditor.inputElement.style.fontFamily = 'Courier New, Courier, monospace';
+        activeInlineEditor.inputElement.style.fontWeight = 'normal';
+        activeInlineEditor.inputElement.style.fontStyle = 'normal';
+    } else if (fVal === 'cobo') {
+        activeInlineEditor.inputElement.style.fontFamily = 'Courier New, Courier, monospace';
+        activeInlineEditor.inputElement.style.fontWeight = 'bold';
+        activeInlineEditor.inputElement.style.fontStyle = 'normal';
+    } else if (fVal === 'hebo') {
+        activeInlineEditor.inputElement.style.fontFamily = 'Arial, Helvetica, sans-serif';
+        activeInlineEditor.inputElement.style.fontWeight = 'bold';
+        activeInlineEditor.inputElement.style.fontStyle = 'normal';
     } else if (fVal === 'heit') {
-        activeInlineEditor.inputElement.style.fontFamily = 'Arial, sans-serif';
+        activeInlineEditor.inputElement.style.fontFamily = 'Arial, Helvetica, sans-serif';
+        activeInlineEditor.inputElement.style.fontWeight = 'normal';
+        activeInlineEditor.inputElement.style.fontStyle = 'italic';
+    } else if (fVal === 'hebi') {
+        activeInlineEditor.inputElement.style.fontFamily = 'Arial, Helvetica, sans-serif';
+        activeInlineEditor.inputElement.style.fontWeight = 'bold';
         activeInlineEditor.inputElement.style.fontStyle = 'italic';
     } else {
-        activeInlineEditor.inputElement.style.fontFamily = 'Arial, sans-serif';
+        activeInlineEditor.inputElement.style.fontFamily = 'Arial, Helvetica, sans-serif';
         activeInlineEditor.inputElement.style.fontWeight = 'normal';
         activeInlineEditor.inputElement.style.fontStyle = 'normal';
     }
