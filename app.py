@@ -54,30 +54,49 @@ def get_session_filename(session_id):
             pass
     return sessions.get(session_id, {}).get('filename', 'edited_document.pdf')
 
+BASE14_FONTS = {
+    'helv', 'hebo', 'heit', 'hebi',
+    'times', 'tibo', 'tiit', 'tibi',
+    'couri', 'cobo', 'coit', 'cobi',
+    'symb', 'zadb'
+}
+
 def get_font_candidate(font_name):
-    lower = (font_name or '').lower()
-    if 'times' in lower or 'serif' in lower:
-        if 'bold' in lower and ('italic' in lower or 'oblique' in lower):
+    if not font_name:
+        return 'helv'
+    
+    clean = str(font_name).strip().lower()
+    if clean in BASE14_FONTS:
+        return clean
+    
+    # Check Times / Serif
+    if any(k in clean for k in ['times', 'serif', 'georgia', 'garamond', 'cambria', 'roman']):
+        if ('bold' in clean or 'black' in clean) and ('italic' in clean or 'oblique' in clean):
             return 'tibi'
-        elif 'bold' in lower:
+        elif 'bold' in clean or 'black' in clean or 'heavy' in clean:
             return 'tibo'
-        elif 'italic' in lower or 'oblique' in lower:
+        elif 'italic' in clean or 'oblique' in clean:
             return 'tiit'
         return 'times'
-    elif 'courier' in lower or 'mono' in lower or 'consolas' in lower:
-        if 'bold' in lower and ('italic' in lower or 'oblique' in lower):
+    
+    # Check Courier / Monospace
+    if any(k in clean for k in ['courier', 'mono', 'consolas', 'code', 'typewriter']):
+        if ('bold' in clean or 'black' in clean) and ('italic' in clean or 'oblique' in clean):
             return 'cobi'
-        elif 'bold' in lower:
+        elif 'bold' in clean or 'black' in clean or 'heavy' in clean:
             return 'cobo'
-        elif 'italic' in lower or 'oblique' in lower:
+        elif 'italic' in clean or 'oblique' in clean:
             return 'coit'
         return 'couri'
-    elif 'bold' in lower and ('italic' in lower or 'oblique' in lower):
+    
+    # Sans-serif (Arial, Helvetica, Calibri, Roboto, Segoe, Open Sans, etc.)
+    if ('bold' in clean or 'black' in clean or 'heavy' in clean) and ('italic' in clean or 'oblique' in clean):
         return 'hebi'
-    elif 'bold' in lower or 'black' in lower or 'heavy' in lower:
+    elif 'bold' in clean or 'black' in clean or 'heavy' in clean:
         return 'hebo'
-    elif 'italic' in lower or 'oblique' in lower:
+    elif 'italic' in clean or 'oblique' in clean:
         return 'heit'
+    
     return 'helv'
 
 def safe_insert_text(page, point, text, fontsize, fontname, color):
