@@ -588,7 +588,7 @@ function positionInlineToolbar(box) {
     if (inlineBgPicker) {
         inlineBgPicker.value = activeInlineEditor.currentBgColorHex || '#ffffff';
     }
-
+    inlineFontSelect.value = activeInlineEditor.currentFont || 'helv';
     setEditorAlignment(activeInlineEditor.currentAlign || 'left');
     updateStyleToggleButtons(activeInlineEditor.currentFont || 'helv');
     if (window.lucide) window.lucide.createIcons();

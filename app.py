@@ -97,6 +97,21 @@ def get_font_candidate(font_name):
     elif 'italic' in clean or 'oblique' in clean:
         return 'heit'
     
+FONT_NAME_MAP = {
+    'helv': ('helv', 'Helvetica', 'Arial'),
+    'hebo': ('hebo', 'Helvetica-Bold', 'Arial-Bold', 'Helvetica,Bold'),
+    'heit': ('heit', 'Helvetica-Oblique', 'Arial-Italic', 'Helvetica,Italic'),
+    'hebi': ('hebi', 'Helvetica-BoldOblique', 'Arial-BoldItalic'),
+    'times': ('times', 'Times-Roman', 'TimesNewRoman', 'Times'),
+    'tibo': ('tibo', 'Times-Bold', 'TimesNewRoman-Bold', 'Times,Bold'),
+    'tiit': ('tiit', 'Times-Italic', 'TimesNewRoman-Italic', 'Times,Italic'),
+    'tibi': ('tibi', 'Times-BoldItalic', 'TimesNewRoman-BoldItalic'),
+    'couri': ('couri', 'Courier', 'CourierNew'),
+    'cobo': ('cobo', 'Courier-Bold', 'CourierNew-Bold', 'Courier,Bold'),
+    'coit': ('coit', 'Courier-Oblique', 'CourierNew-Italic', 'Courier,Italic'),
+    'cobi': ('cobi', 'Courier-BoldOblique', 'CourierNew-BoldItalic')
+}
+
 def safe_insert_text(page, point, text, fontsize, fontname, color, rect=None, align='left'):
     candidate = get_font_candidate(fontname)
     fs = float(fontsize)
@@ -117,28 +132,31 @@ def safe_insert_text(page, point, text, fontsize, fontname, color, rect=None, al
             
     final_point = fitz.Point(x, point.y)
 
-    # Attempt 1: Valid Base-14 font code
+    # Attempt font name and all supported aliases for this style
+    aliases = FONT_NAME_MAP.get(candidate, (candidate,))
+    for alias in aliases:
+        try:
+            page.insert_text(final_point, text, fontsize=fs, fontname=alias, color=c)
+            return
+        except Exception:
+            pass
+
+    # Fallback to bold Helvetica if bold, else regular
+    fallback_font = 'hebo' if 'bo' in candidate or 'bi' in candidate else 'helv'
     try:
-        page.insert_text(final_point, text, fontsize=fs, fontname=candidate, color=c)
+        page.insert_text(final_point, text, fontsize=fs, fontname=fallback_font, color=c)
         return
     except Exception:
         pass
 
-    # Attempt 2: Standard built-in Helvetica
-    try:
-        page.insert_text(final_point, text, fontsize=fs, fontname='helv', color=c)
-        return
-    except Exception:
-        pass
-
-    # Attempt 3: PyMuPDF default
+    # PyMuPDF default
     try:
         page.insert_text(final_point, text, fontsize=fs, color=c)
         return
     except Exception:
         pass
 
-    # Attempt 4: Textbox alignment fallback
+    # Textbox alignment fallback
     if rect is not None:
         try:
             al = fitz.TEXT_ALIGN_RIGHT if align == 'right' else (fitz.TEXT_ALIGN_CENTER if align == 'center' else fitz.TEXT_ALIGN_LEFT)
