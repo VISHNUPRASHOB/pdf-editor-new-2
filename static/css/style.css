@@ -435,6 +435,11 @@ body {
     padding: 0;
 }
 
+.text-element-box.editing::before {
+    display: none !important;
+    pointer-events: none !important;
+}
+
 /* In-line Input Field directly on document */
 .inline-text-input {
     width: 100%;
@@ -453,6 +458,12 @@ body {
     font-style: inherit;
     line-height: 1.2;
     display: block;
+    position: relative;
+    z-index: 10;
+    pointer-events: auto !important;
+    cursor: text !important;
+    user-select: text !important;
+    -webkit-user-select: text !important;
 }
 
 

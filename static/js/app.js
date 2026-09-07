@@ -461,6 +461,12 @@ function startInlineEditing(box, item, pageIndex, scaleX, scaleY) {
 
     input.addEventListener('input', adjustWidth);
 
+    ['mousedown', 'click', 'dblclick', 'mouseup'].forEach(evtName => {
+        input.addEventListener(evtName, (e) => {
+            e.stopPropagation();
+        });
+    });
+
     input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
             e.preventDefault();
